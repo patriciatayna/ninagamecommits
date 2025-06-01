@@ -1,9 +1,7 @@
 import pgzrun, random, time
 from pygame import Rect
 
-WIDTH = 1280
-HEIGHT = 720
-
+WIDTH, HEIGHT = 1280, 720
 GRAVITY = 0.4
 slower_anim_nina = 3
 game_level = 1
