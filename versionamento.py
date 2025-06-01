@@ -4,8 +4,9 @@ from pygame import Rect
 WIDTH, HEIGHT, TITLE = 1280, 720, "Neo-Nina and The Systems"
 GRAVITY, MAX_ALLIES = 0.4, 3
 slower_anim_nina = 3
-bg_music, bg_image = 'Hardware_Prototype.wav', Actor(
-    "background_city", (WIDTH//2, HEIGHT//2))
+bg_music, bg_game, bg_menu = 'Hardware_Prototype.wav', Actor(
+    "background_city", (WIDTH//2, HEIGHT//2)), Actor(
+    "background_menu", (WIDTH//2, HEIGHT//2))
 #endregion
 #region Classes
 class NeonNina:
@@ -51,7 +52,7 @@ class NeonNina:
                 self.actor.y = p.rect().top-self.actor.height//2
                 self.vy, self.on_ground = 0, True
 
-        if self.actor.y > HEIGHT: game_over()
+        if self.actor.y > HEIGHT: session.game_over()
         self.animate()
 
     def animate(self):
@@ -75,8 +76,8 @@ class EnemyDrone:
         self.actor.y += self.vy
         if self.actor.y < self.upper_limit or self.actor.y > self.lower_limit:
             self.vy *= -1
-        if self.actor.distance_to(neon_nina.actor) < 200:
-            self.attack(neon_nina.actor)
+        if self.actor.distance_to(session.neon_nina.actor) < 200:
+            self.attack(session.neon_nina.actor)
 
     def attack(self, target): screen.draw.line(self.actor.pos, target.pos, "yellow")
     def draw(self): self.actor.draw()
@@ -95,19 +96,20 @@ class GameSession:
 
     def draw(self):
         screen.clear()
-        self.neon_nina.draw()
+        if self.state == 'playing': self.neon_nina.draw()
         for enemy in self.enemies: enemy.draw()
     
     def start_game(self):
         self.reset()
         self.state = 'playing'
+        self.neon_nina = NeonNina(100, 400)
+        self.enemies = [EnemyDrone(600, 100), EnemyDrone(700, 200), EnemyDrone(400, 150)]
         #sounds.hardware_prototype.play(-1)
 
     def game_over(self): self.state = 'gameover'
 #endregion
 #region Session
 session = GameSession()
-neon_nina = NeonNina(100, 400)
 platforms = ([Platform(128 + i * 128, 512, 'plataform_ground') for i in range(3)] 
 + [Platform(640 + i * 128, 368, 'plataform_media') for i in range(2)] 
 + [Platform(1058 + i * 128, 256, 'plataform_special') for i in range(1)])
@@ -121,22 +123,23 @@ def draw():
     if session.state == 'menu': draw_menu()
 
     elif session.state == 'playing':
-        bg_image.draw()
+        bg_game.draw()
         for p in platforms: p.draw()
         for d in drones: d.draw()
-        neon_nina.draw()
+        session.neon_nina.draw()
 
     elif session.state == 'victory': session.draw_victory_screen()
     elif session.state == 'gameover': draw_game_over()
+
 #endregion
 #region Update
 def update():
     if session.state == 'playing':
-        neon_nina.update()
+        session.neon_nina.update()
         for d in drones:
             d.update()
         if keyboard.h:
-            neon_nina.hacking()
+            session.neon_nina.hacking()
 #endregion
 #region Eventos
 def on_mouse_down(pos):
@@ -154,14 +157,16 @@ def on_key_down(key):
 #endregion
 #region UI
 def draw_menu():
-    screen.fill((10, 10, 20))
-    screen.draw.text("Neo-Nina and the Systems", center=(WIDTH//2, 100), fontsize=40, color="white")
+    bg_menu.draw()
+    screen.draw.text("Neo-Nina and the Systems", center=(WIDTH//2-64, 100), 
+                     fontsize=64, color="white")
     for button in menu_buttons:
         screen.draw.filled_rect(button["rect"], "gray")
-        screen.draw.text(button["label"], center=button["rect"].center, fontsize=30, color="white")
+        screen.draw.text(button["label"], center=button["rect"].center, 
+                         fontsize=40, color="white")
 def draw_game_over():
     screen.fill("darkred")
     screen.draw.text("GAME OVER", center=(WIDTH//2, HEIGHT//2), fontsize=60, color="white")
-    screen.draw.text("Press Enter to return to menu", center=(WIDTH//2, HEIGHT//2 + 60), fontsize=30, color="white")
+    screen.draw.text("Press Enter to return to menu", center=(WIDTH//2, HEIGHT//2 + 60), fontsize=48, color="white")
 #endregion
 pgzrun.go()
