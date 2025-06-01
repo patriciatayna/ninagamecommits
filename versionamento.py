@@ -1,68 +1,39 @@
 import pgzrun
 import random
-import math
-
 from pygame import Rect
+import time
 
 #region Config
-WIDTH, HEIGHT = 1280, 720
+WIDTH, HEIGHT = 1280,720
 TITLE = "Neo-Nina and The Systems"
-GRAVITY = 0.5
+GRAVITY = 0.4
+SLOWERANIMATION = 2
+MAX_ALLIES = 3
 bg_music = 'Hardware_Prototype.wav'
-fullscreen = True
 background = Actor("background_city", (WIDTH//2, HEIGHT//2))
 
-#endregion
-
-# Gaming
-class GameSession:
-    def __init__(self):
-        self.reset()
-
-    def reset(self):
-        self.state = 'menu'
-
-    def start_game(self):
-        self.reset()
-        self.state = 'playing'
-        #sounds.hardware_prototype.play(-1)
-
-    def game_over(self):
-        self.state = 'gameover'
-
-#region Classes
-class Platform:
-    def __init__(self, x, y, sprite):
-        self.actor = Actor(sprite, (x, y))
-
-    def draw(self):
-        self.actor.draw()
-
-    def rect(self):
-        return self.actor._rect
-
-class NeoNina:
+class NeonNina:
     def __init__(self, x, y):
-        self.actor = Actor('neon_nina_idle_1', (x, y))
+        self.actor = Actor('neon_nina_idle_2', (x, y))
         self.vx = 0
         self.vy = 0
         self.speed = 3
         self.on_ground = False
         self.action = 'idle'
         self.animations = {
-            'idle': ['neon_nina_idle_1','neon_nina_idle_2'],
+            'idle': ['neon_nina_idle_1', 'neon_nina_idle_2'],
             'jump': ['neon_nina_jump_1','neon_nina_jump_2','neon_nina_jump_3'],
-            'run': ['neon_nina_run'],
+            'run': ['neon_nina_run_1', 'neon_nina_run_2', 'neon_nina_run_3'],
             'hit': ['neon_nina_hit'],
         }
         self.frame = 0
-        self.counter = 0
-        self.delay = 6
+        self.last_frame_time = time.time()
+        self.animation_delay = SLOWERANIMATION*0.1
         self.allies = []
         self.hp = 100
 
-        self.animation_delay = 0.2
-        self.last_frame_time = 0
+    def draw(self):
+        self.actor.draw()
 
     def update(self):
         if keyboard.left:
@@ -78,9 +49,9 @@ class NeoNina:
             self.action = 'idle'
 
         if keyboard.up and self.on_ground:
-            self.vy = -16
-            self.action = 'jump'
+            self.vy = -14
             self.on_ground = False
+            self.action = 'jump'
 
         self.vy += GRAVITY
         self.actor.x += self.vx
@@ -95,37 +66,40 @@ class NeoNina:
                 self.on_ground = True
 
         if self.actor.y > HEIGHT:
-            session.game_over()
+            game_over()
 
         self.animate()
 
     def animate(self):
         if self.action not in self.animations:
             return
-        self.counter += 1
-        if self.counter >= self.delay:
-            self.counter = 0
-            self.frame = (self.frame + 1) % len(self.animations[self.action])
-            self.actor.image = self.animations[self.action][self.frame]
+        
+        now = time.time()
+        if now - self.last_frame_time >= self.animation_delay:
+            frames = self.animations[self.action]
+            self.frame = (self.frame + 1) % len(frames)
+            self.actor.image = frames[self.frame]
+            self.last_frame_time = now
 
-    def hacking(self):
-        for d in drones:
-            if self.actor.distance_to(d.actor) < 100 and not d.ally:
-                if len(self.allies) < MAX_ALLIES:
-                    d.ally = True
-                    self.allies.append(d)
-                    #session.total_allies += 1
-                    break
+    # def hacking(self):
+    #     for d in drones:
+    #         if self.actor.distance_to(d.actor) < 100 and not d.ally:
+    #             if len(self.allies) < MAX_ALLIES:
+    #                 d.ally = True
+    #                 self.allies.append(d)
+    #                 break    
+
+class Platform:
+    def __init__(self, x, y, sprite):
+        self.actor = Actor(sprite, (x, y))
 
     def draw(self):
         self.actor.draw()
-        for i, ally in enumerate(self.allies):
-            icon = Actor("ally_icon", (30 + i * 40, 50))
-            icon.draw()
-        screen.draw.filled_rect(Rect(10, 10, self.hp * 2, 20), "red")
-        screen.draw.rect(Rect(10, 10, 200, 20), "white")
 
-class Drone:
+    def rect(self):
+        return self.actor._rect
+
+class EnemyDrone:
     def __init__(self, x, y):
         self.actor = Actor('enemy_drone', (x, y))
         self.vy = random.choice([-1, 1]) * random.uniform(0.5, 1.2)
@@ -138,46 +112,75 @@ class Drone:
         self.actor.y += self.vy
         if self.actor.y < self.upper_limit or self.actor.y > self.lower_limit:
             self.vy *= -1
-        if self.ally:
-            self.search_target()
+        # if self.ally:
+        #     self.search_target()
         else:
-            if self.actor.distance_to(neo_nina.actor) < 100:
-                self.attack(neo_nina.actor)
-
-    def search_target(self):
-        for d in drones:
-            if not d.ally and self.actor.distance_to(d.actor) < 150:
-                self.target = d
-                break
-        if self.target:
-            dx = self.target.actor.x - self.actor.x
-            dy = self.target.actor.y - self.actor.y
-            self.actor.x += 0.8 if dx > 0 else -0.8
-            self.actor.y += 0.5 if dy > 0 else -0.5
-            if self.actor.distance_to(self.target.actor) < 20:
-                self.attack(self.target.actor)
+            if self.actor.distance_to(neon_nina.actor) < 200:
+                self.attack(neon_nina.actor)
 
     def attack(self, target):
         screen.draw.line(self.actor.pos, target.pos, "yellow")
 
     def draw(self):
         self.actor.draw()
+        #if hasattr(target, "hp"):
+            #target.hp -= 10
 
-# Objects
+    # def search_target(self):
+    #     nearest = None
+    #     min_dist = float('inf')
+    #     for enemy in self.game.enemies:
+    #         if enemy is not self and not enemy.ally:
+    #             dist = self.actor.distance_to(enemy.actor)
+    #             if dist < min_dist:
+    #                 min_dist = dist
+    #                 nearest = enemy
+    #     if nearest and min_dist < 150:
+    #         self.attack(nearest)
+
+class GameSession:
+    def __init__(self):
+        self.reset()
+        self.neon_nina = NeonNina(WIDTH // 2, HEIGHT//2)
+        self.enemies = []
+
+    def reset(self):
+        self.state = 'menu'
+
+    def update(self):
+        self.neon_nina.update()
+        for enemy in self.enemies:
+            enemy.update()
+
+    def draw(self):
+        screen.clear()
+        self.neon_nina.draw()
+        for enemy in self.enemies:
+            enemy.draw()
+    
+    def start_game(self):
+        self.reset()
+        self.state = 'playing'
+        #sounds.hardware_prototype.play(-1)
+
+    def game_over(self):
+        self.state = 'gameover'
 
 session = GameSession()
-neo_nina = NeoNina(100, 400)
-platforms = ([Platform(100 + i * 60, 500, 'plataform_ground') for i in range(3)] 
-+ [Platform(420 + i * 60, 350, 'plataform_media') for i in range(4)] 
-+ [Platform(760 + i * 60, 290, 'plataform_special') for i in range(3)])
+neon_nina = NeonNina(100, 400)
+platforms = ([Platform(128 + i * 128, 512, 'plataform_ground') for i in range(3)] 
++ [Platform(640 + i * 128, 368, 'plataform_media') for i in range(2)] 
++ [Platform(1058 + i * 128, 256, 'plataform_special') for i in range(1)])
 
-drones = [Drone(600, 100), Drone(700, 200), Drone(400, 150)]
+drones = [EnemyDrone(600, 100), EnemyDrone(700, 200), EnemyDrone(400, 150)]
 menu_buttons = [{"label": "Play", "action": "play", "rect": Rect((WIDTH//2 - 60, 200), (120, 40))},
     {"label": "Exit", "action": "exit", "rect": Rect((WIDTH//2 - 60, 260), (120, 40))}]
 
-# Draw
+def update():
+    session.update()
 
 def draw():
+    session.draw()
     if session.state == 'menu':
         draw_menu()
     elif session.state == 'playing':
@@ -186,24 +189,22 @@ def draw():
             p.draw()
         for d in drones:
             d.draw()
-        neo_nina.draw()
+        neon_nina.draw()
     elif session.state == 'victory':
         session.draw_victory_screen()
     elif session.state == 'gameover':
         draw_game_over()
 
 # Update
-
 def update():
     if session.state == 'playing':
-        neo_nina.update()
+        neon_nina.update()
         for d in drones:
             d.update()
         if keyboard.h:
-            neo_nina.hacking()
+            neon_nina.hacking()
 
 # Eventos
-
 def on_mouse_down(pos):
     if session.state == 'menu':
         for button in menu_buttons:
@@ -218,7 +219,6 @@ def on_key_down(key):
         session.reset()
 
 # UI
-
 def draw_menu():
     screen.fill((10, 10, 20))
     screen.draw.text("Neo-Nina and the Systems", center=(WIDTH//2, 100), fontsize=40, color="white")
@@ -232,5 +232,5 @@ def draw_game_over():
     screen.draw.text("Press Enter to return to menu", center=(WIDTH//2, HEIGHT//2 + 60), fontsize=30, color="white")
 
 # Run Game
-
 pgzrun.go()
+
